@@ -20,9 +20,9 @@ t('2-min prompts on a fixed grid from CPR start (7:02, 7:04, 7:06…) regardless
   assert.ok(/SWITCH COMPRESSOR/.test(al[0].title) && /CHECK PULSE/.test(al[0].title));
 });
 
-t('prewarn 15 s before each check', () => {
+t('pre-warning 10 s before each check', () => {
   const pre = L.alerts([start('PEA')], {}, T0, 3 * M).find(a => a.kind === 'prewarn');
-  assert.strictEqual(pre.at, T0 + 2 * M - 15000);
+  assert.strictEqual(pre.at, T0 + 2 * M - 10000);
 });
 
 t('unacknowledged check is pending; acknowledging counts a switch', () => {
@@ -33,17 +33,34 @@ t('unacknowledged check is pending; acknowledging counts a switch', () => {
   assert.strictEqual(x.pendingCheck, undefined); assert.strictEqual(x.state.switches, 1);
 });
 
-t('ASYSTOLE/PEA: adrenaline due at CPR start, then every 4 min from the dose (7:00 → 7:04)', () => {
+t('no adrenaline alarm at CPR start, even with ASYSTOLE entered; card shows due, alarm rings at 4 min', () => {
   const ev = [start('ASYSTOLE')];
-  assert.strictEqual(L.status(ev, {}, T0 + 1000).adrDue, T0);
+  const atStart = L.alerts(ev, {}, T0 + 1000, 0).filter(a => a.kind === 'adr' && a.at <= T0 + 1000);
+  assert.strictEqual(atStart.length, 0, 'nothing rings at start');
+  const x = L.status(ev, {}, T0 + 1000);
+  assert.strictEqual(x.adrDue, T0, 'card shows due (visual)');
+  assert.strictEqual(L.clock(x.adrAlarmAt), '7:04 PM');
+  assert.strictEqual(L.alerts(ev, {}, T0, 5 * M).find(a => a.kind === 'adr').at, T0 + 4 * M);
+});
+
+t('unknown rhythm at start: no visual due; rhythm entered later makes it due', () => {
+  const ev = [start(null)];
+  assert.strictEqual(L.status(ev, {}, T0 + 1000).adrDue, null);
+  ev.push({ type: 'rhythm', t: T0 + 40000, rhythm: 'PEA' });
+  assert.strictEqual(L.status(ev, {}, T0 + 41000).adrDue, T0 + 40000);
+});
+
+t('after a dose: next alarm 4 min after the dose (7:00 → 7:04)', () => {
+  const ev = [start('ASYSTOLE')];
   ev.push({ type: 'adr', t: T0, n: 1 });
   assert.strictEqual(L.clock(L.status(ev, {}, T0).adrDue), '7:04 PM');
   assert.strictEqual(L.status(ev, { adrIntervalMin: 3 }, T0).adrDue, T0 + 3 * M);
 });
 
-t('VT/VF: first adrenaline after 2nd shock, or at 4 min if no shocks logged', () => {
+t('VT/VF: card due after 2nd shock; alarm at 4 min from CPR start', () => {
   const ev = [start('VF')];
-  assert.strictEqual(L.status(ev, {}, T0).adrDue, T0 + 4 * M);
+  assert.strictEqual(L.status(ev, {}, T0).adrDue, null);
+  assert.strictEqual(L.status(ev, {}, T0).adrAlarmAt, T0 + 4 * M);
   ev.push({ type: 'shock', t: T0 + 10000, n: 1 }, { type: 'shock', t: T0 + 2 * M + 10000, n: 2 });
   assert.strictEqual(L.status(ev, {}, T0 + 2 * M + 11000).adrDue, T0 + 2 * M + 10000);
 });

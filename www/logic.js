@@ -5,8 +5,10 @@
  * Timing model (as requested):
  *  - Main timer runs from the time CPR / Code Blue started.
  *  - Every 2 min from CPR start (fixed grid): SWITCH COMPRESSOR + CHECK PULSE (visual + ringing).
- *  - Adrenaline every 4 min (3–5 adjustable) from the last dose given.
- *    First dose: ASYSTOLE/PEA -> at CPR start; VT/VF -> after 2nd shock or 4 min after CPR start, whichever first.
+ *  - Adrenaline alarm every 4 min (3–5 adjustable): 4 min after CPR start, then 4 min after each dose given.
+ *    No alarm at CPR start (rhythm is known only once the defibrillator is attached). The first-dose card turns
+ *    "due" (visual only) once ASYSTOLE/PEA is entered, or after the 2nd shock (3rd, ERC) in VT/VF.
+ *  - Alarms build up gently over the last `rampSec` seconds and are loudest at the due time.
  */
 (function (root) {
   'use strict';
@@ -18,7 +20,8 @@
     cycleMin: 2,
     guideline: 'AHA',             // VT/VF first adrenaline: 'AHA' after 2nd shock, 'ERC' after 3rd
     antiarrhythmic: 'amiodarone', // 'amiodarone' | 'lignocaine'
-    prewarnSec: 15,
+    rampSec: 10,                  // gentle build-up before each alarm
+    prewarnSec: 10,
     metronome: false,
     metronomeBpm: 110
   };
@@ -81,7 +84,7 @@
       ended: false, endedAt: null, outcome: null,
       rhythm: null, rosc: false,
       shocks: 0, shockNeedMetAt: null, adrDoses: 0, lastAdrAt: null, aaDoses: 0,
-      switches: 0, cyclesAcked: {},
+      switches: 0, cyclesAcked: {}, nonShockAt: null,
       hsts: {}, airway: {}
     };
     for (var i = 0; i < events.length; i++) {
@@ -90,8 +93,12 @@
         case 'start':
           s.started = true; s.cprAt = e.t; s.anchor = e.t;
           s.arrestAt = e.arrestAt || e.t; s.rhythm = e.rhythm || null;
+          if (isNonShockable(e.rhythm)) s.nonShockAt = e.t;
           break;
-        case 'rhythm': s.rhythm = e.rhythm; break;
+        case 'rhythm':
+          s.rhythm = e.rhythm;
+          if (isNonShockable(e.rhythm) && s.nonShockAt === null) s.nonShockAt = e.t;
+          break;
         case 'shock':
           s.shocks++;
           if (s.shocks === 2) s.shock2At = e.t;
@@ -103,6 +110,7 @@
         case 'rosc': s.rosc = true; s.rhythm = 'ROSC'; break;
         case 'rearrest':
           s.rosc = false; s.rhythm = e.rhythm || null; s.anchor = e.t; s.cyclesAcked = {};
+          if (isNonShockable(e.rhythm) && s.nonShockAt === null) s.nonShockAt = e.t;
           break;
         case 'end': s.ended = true; s.endedAt = e.t; s.outcome = e.outcome; break;
         case 'hst': s.hsts[e.key] = !!e.on; break;
@@ -112,17 +120,26 @@
     return s;
   }
 
+  /* due: when the card shows "give now" (visual). alarmAt: when it rings. */
   function adrenalineDue(s, st) {
-    if (!s.started || s.ended || s.rosc) return { due: null, reason: '' };
+    if (!s.started || s.ended || s.rosc) return { due: null, alarmAt: null, reason: '' };
     var interval = st.adrIntervalMin * MIN;
-    if (s.lastAdrAt !== null) return { due: s.lastAdrAt + interval, reason: 'Every ' + st.adrIntervalMin + ' min from last dose' };
-    if (isShockable(s.rhythm)) {
-      var shockT = st.guideline === 'ERC' ? s.shock3At : s.shock2At;
-      var byTime = s.anchor + interval;
-      var due = shockT ? Math.min(shockT, byTime) : byTime;
-      return { due: due, reason: 'VT/VF: after ' + (st.guideline === 'ERC' ? '3rd' : '2nd') + ' shock or ' + st.adrIntervalMin + ' min' };
+    if (s.lastAdrAt !== null) {
+      var n = s.lastAdrAt + interval;
+      return { due: n, alarmAt: n, reason: 'Every ' + st.adrIntervalMin + ' min from last dose' };
     }
-    return { due: s.anchor, reason: s.rhythm ? s.rhythm + ': give as soon as possible' : 'Give as soon as possible' };
+    var alarmAt = s.anchor + interval, due = null, reason;
+    if (isShockable(s.rhythm)) {
+      due = (st.guideline === 'ERC' ? s.shock3At : s.shock2At) || null;
+      reason = 'VT/VF: first dose after ' + (st.guideline === 'ERC' ? '3rd' : '2nd') + ' shock';
+    } else if (s.nonShockAt !== null) {
+      due = s.nonShockAt;
+      reason = 'ASYSTOLE/PEA: give first dose as soon as possible';
+    } else {
+      reason = 'Give first dose once rhythm is confirmed';
+    }
+    if (due !== null && due > alarmAt) due = alarmAt;
+    return { due: due, alarmAt: alarmAt, reason: reason };
   }
 
   function antiarrhythmicDue(s, st) {
@@ -154,8 +171,9 @@
       if (k > 1 && !s.cyclesAcked[k - 1]) out.pendingCheck = k - 1;
     }
     var a = adrenalineDue(s, st);
-    out.adrDue = a.due; out.adrReason = a.reason;
+    out.adrDue = a.due; out.adrAlarmAt = a.alarmAt; out.adrReason = a.reason;
     if (a.due !== null) out.adrRemaining = a.due - now;
+    if (a.alarmAt !== null) out.adrAlarmRemaining = a.alarmAt - now;
     out.aa = antiarrhythmicDue(s, st);
     out.estCompressions = Math.round((out.elapsed / MIN) * st.metronomeBpm);
     return out;
@@ -176,11 +194,12 @@
       list.push({ key: 'pre@' + s.anchor + '@' + k, at: at - st.prewarnSec * 1000, kind: 'prewarn', title: 'Pulse check in ' + st.prewarnSec + ' s', body: 'Next compressor get ready.' });
       list.push({ key: 'cyc@' + s.anchor + '@' + k, at: at, kind: 'cycle', k: k, title: 'SWITCH COMPRESSOR · CHECK PULSE', body: 'Cycle ' + k + ' done (' + mmss(k * cyc) + ').' });
     }
-    if (x.adrDue !== null && x.adrDue !== undefined) {
-      var base = s.lastAdrAt === null ? 'first' : String(s.lastAdrAt);
-      list.push({ key: 'adr@' + base, at: x.adrDue, kind: 'adr', title: 'GIVE ADRENALINE 1 mg', body: 'IV/IO now. Tap "Adrenaline given".' });
+    if (x.adrAlarmAt !== null && x.adrAlarmAt !== undefined) {
+      var base = s.lastAdrAt === null ? 'first@' + s.anchor : String(s.lastAdrAt);
+      list.push({ key: 'adrpre@' + base, at: x.adrAlarmAt - st.prewarnSec * 1000, kind: 'prewarn', title: 'Adrenaline due in ' + st.prewarnSec + ' s', body: 'Prepare 1 mg.' });
+      list.push({ key: 'adr@' + base, at: x.adrAlarmAt, kind: 'adr', title: 'GIVE ADRENALINE 1 mg', body: 'IV/IO now. Tap "Adrenaline given".' });
       for (i = 1; i <= 10; i++) {
-        list.push({ key: 'adr@' + base + '+' + i, at: x.adrDue + i * MIN, kind: 'adr', title: 'ADRENALINE OVERDUE', body: '1 mg IV/IO. Tap "Adrenaline given".' });
+        list.push({ key: 'adr@' + base + '+' + i, at: x.adrAlarmAt + i * MIN, kind: 'adr', title: 'ADRENALINE OVERDUE', body: '1 mg IV/IO. Tap "Adrenaline given".' });
       }
     }
     if (x.aa && x.aa.ready) {

@@ -31,21 +31,34 @@
     if (actx && actx.state === 'suspended') actx.resume();
     return actx;
   }
-  function tone(freq, start, dur, vol) {
+  /* Soft bell: sine fundamental + quiet overtone, quick attack, natural decay (ear-friendly). */
+  function bell(freq, start, dur, vol) {
     var a = audio(); if (!a) return;
-    var o = a.createOscillator(), g = a.createGain();
-    o.type = 'square'; o.frequency.value = freq;
-    g.gain.setValueAtTime(0.0001, a.currentTime + start);
-    g.gain.exponentialRampToValueAtTime(vol || 0.6, a.currentTime + start + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + start + dur);
-    o.connect(g); g.connect(a.destination);
-    o.start(a.currentTime + start); o.stop(a.currentTime + start + dur + 0.05);
+    var t0 = a.currentTime + start, v = Math.max(0.0002, vol || 0.5);
+    [[1, 1], [2.01, 0.25], [3.02, 0.08]].forEach(function (p) {
+      var o = a.createOscillator(), g = a.createGain();
+      o.type = 'sine'; o.frequency.value = freq * p[0];
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(v * p[1], t0 + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(a.destination);
+      o.start(t0); o.stop(t0 + dur + 0.05);
+    });
   }
-  var PATTERNS = {   // one "ring" of each alarm
-    cycle: function () { for (var i = 0; i < 4; i++) tone(i % 2 ? 1000 : 1300, i * 0.18, 0.15); },
-    adr: function () { tone(620, 0, 0.35); tone(880, 0.4, 0.35); },
-    aa: function () { tone(900, 0, 0.3); tone(600, 0.35, 0.3); },
-    prewarn: function () { tone(1000, 0, 0.15, 0.3); }
+  var NOTES = {           // first note is also used for the gentle build-up
+    cycle: [[1319, 0], [1047, 0.32]],              // ding-dong
+    adr: [[784, 0], [988, 0.22], [1175, 0.44]],    // rising chime
+    aa: [[880, 0], [659, 0.3]],
+    prewarn: [[1047, 0]]
+  };
+  function chime(kind, vol) {
+    (NOTES[kind] || NOTES.cycle).forEach(function (n) { bell(n[0], n[1], 0.9, vol); });
+  }
+  var PATTERNS = {
+    cycle: function () { chime('cycle', 0.8); },
+    adr: function () { chime('adr', 0.8); },
+    aa: function () { chime('aa', 0.8); },
+    prewarn: function () { chime('prewarn', 0.3); }
   };
   function vibrate(ms) {
     if (Haptics) { Haptics.vibrate({ duration: ms }).catch(function () {}); }
@@ -92,7 +105,7 @@
   function alarmStillValid(x) {
     if (!alarm) return false;
     if (alarm.kind === 'cycle') return !!x.pendingCheck;
-    if (alarm.kind === 'adr') return x.adrRemaining !== undefined && x.adrRemaining <= 0;
+    if (alarm.kind === 'adr') return x.adrAlarmRemaining !== undefined && x.adrAlarmRemaining <= 0;
     if (alarm.kind === 'aa') return !!(x.aa && x.aa.ready);
     return now() < alarm.until + 4000;
   }
@@ -381,7 +394,12 @@
     seg('Compression rate (metronome & estimate)', 'metronomeBpm', [100, 110, 120], function (o) { return o + '/min'; });
     var l = document.createElement('div'); l.className = 'label'; l.textContent = 'Test'; box.appendChild(l);
     var test = document.createElement('button'); test.className = 'btn wide'; test.textContent = 'Test alarm sound & vibration';
-    test.addEventListener('click', function () { audio(); startAlarm({ kind: 'prewarn', title: 'TEST ALARM', body: 'If you cannot hear this, raise media volume.' }); PATTERNS.cycle(); });
+    test.addEventListener('click', function () {
+      audio();
+      // demo: gentle build-up, then the full alarm
+      for (var i = 0; i < 6; i++) bell(NOTES.cycle[0][0], i * (0.9 - i * 0.1), 0.5, 0.06 + i * 0.09);
+      setTimeout(function () { startAlarm({ kind: 'prewarn', title: 'TEST ALARM', body: 'If you cannot hear this, raise media volume.' }); PATTERNS.cycle(); vibrate(800); }, 3200);
+    });
     box.appendChild(test);
     box.appendChild(textEl('Changes apply to the running code immediately. Keep media volume up during a code.'));
     modal('Settings', box, [{ text: 'Done', cls: 'ok' }]);
@@ -413,7 +431,7 @@
       var rem = x.cycleRemaining, total = cur.settings.cycleMin * L.MIN, pend = x.pendingCheck;
       var card = $('cycleCard');
       card.classList.toggle('due', !!pend);
-      card.classList.toggle('soon', !pend && rem <= cur.settings.prewarnSec * 1000);
+      card.classList.toggle('soon', !pend && rem <= (cur.settings.rampSec || 10) * 1000);
       $('cycleNo').textContent = x.cycleNo;
       $('cycleTime').textContent = L.mmss(rem + 999);
       $('cycleBar').style.width = Math.min(100, Math.max(0, (1 - rem / total) * 100)) + '%';
@@ -428,11 +446,18 @@
 
       var ac = $('adrCard');
       ac.classList.remove('due', 'soon');
-      if (x.adrDue === null) { $('adrTime').textContent = '—'; $('adrAt').textContent = ''; }
+      if (x.adrAlarmAt === null || x.adrAlarmAt === undefined) { $('adrTime').textContent = '—'; $('adrAt').textContent = ''; }
       else {
-        var ar = x.adrRemaining;
-        if (ar <= 0) { ac.classList.add('due'); $('adrTime').textContent = 'NOW'; $('adrAt').textContent = 'Due since ' + L.clock(x.adrDue) + (ar < -1000 ? ' (' + L.mmss(-ar) + ' overdue)' : ''); }
-        else { if (ar <= 30000) ac.classList.add('soon'); $('adrTime').textContent = L.mmss(ar + 999); $('adrAt').textContent = 'Next dose at ' + L.clock(x.adrDue); }
+        var ar = x.adrAlarmRemaining, firstDue = s.lastAdrAt === null && x.adrDue !== null && x.adrRemaining <= 0;
+        if (ar <= 0) {
+          ac.classList.add('due'); $('adrTime').textContent = 'NOW';
+          $('adrAt').textContent = 'Due since ' + L.clock(x.adrAlarmAt) + (ar < -1000 ? ' (' + L.mmss(-ar) + ' overdue)' : '');
+        } else {
+          if (firstDue) ac.classList.add('due');
+          else if (ar <= (cur.settings.rampSec || 10) * 1000) ac.classList.add('soon');
+          $('adrTime').textContent = L.mmss(ar + 999);
+          $('adrAt').textContent = (firstDue ? 'Give first dose now · ' : '') + 'Alarm at ' + L.clock(x.adrAlarmAt);
+        }
       }
       $('adrReason').textContent = x.adrReason;
       var given = cur.events.filter(function (e) { return e.type === 'adr'; });
@@ -485,13 +510,30 @@
     });
     if (changed) persist();
     // a ringing alarm keeps priority over a pre-warning
-    if (toFire && appActive && t - toFire.at < 10 * L.MIN && !(toFire.kind === 'prewarn' && alarm && alarm.kind !== 'prewarn')) startAlarm(toFire);
+    if (toFire && toFire.kind !== 'prewarn' && appActive && t - toFire.at < 10 * L.MIN) startAlarm(toFire);
+    rampUp(x, t);
     // keep ringing until handled (max 60 s), then stop sound but keep visual on the card
     if (alarm) {
       if (!alarmStillValid(x)) stopAlarm();
       else if (alarm.kind !== 'prewarn' && t < alarm.until && t - alarm.lastRing > 1600 && appActive) ringOnce();
       else if (alarm.kind === 'prewarn' && t > alarm.until + 4000) stopAlarm();
     }
+  }
+  /* Gentle build-up: soft chimes start rampSec before the alarm, getting louder and closer together. */
+  var lastRampAt = 0;
+  function rampUp(x, t) {
+    if (!appActive || x.state.rosc || (alarm && alarm.kind !== 'prewarn')) return;
+    var ramp = (cur.settings.rampSec || 10) * 1000, best = null;
+    if (x.cycleRemaining !== undefined && !x.pendingCheck && x.cycleRemaining > 0 && x.cycleRemaining <= ramp) best = { kind: 'cycle', rem: x.cycleRemaining };
+    if (x.adrAlarmRemaining !== undefined && x.adrAlarmRemaining > 0 && x.adrAlarmRemaining <= ramp && (!best || x.adrAlarmRemaining < best.rem)) best = { kind: 'adr', rem: x.adrAlarmRemaining };
+    if (!best) return;
+    var level = 1 - best.rem / ramp;                 // 0 -> 1 as the alarm approaches
+    var gap = 1400 - 900 * level;                    // 1.4 s apart -> 0.5 s apart
+    if (t - lastRampAt < gap) return;
+    lastRampAt = t;
+    var n = (NOTES[best.kind] || NOTES.cycle)[0];
+    bell(n[0], 0, 0.5, 0.06 + 0.5 * level);          // soft -> loud
+    if (level > 0.6) vibrate(60);
   }
   setInterval(tick, 250);
 
