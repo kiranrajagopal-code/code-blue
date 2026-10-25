@@ -165,3 +165,6 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
 .action.pdf{background:var(--red);margin:6px 0 12px}
 
 .owner.fixed{position:fixed;left:0;right:0;bottom:0;margin:0;padding:12px 12px calc(env(safe-area-inset-bottom) + 12px);background:rgba(11,15,20,.97);border-top:1px solid var(--line);z-index:6;font-size:14px}
+
+.newcode{margin:8px 0 4px;background:var(--panel2);border-color:var(--blue);color:#9cc3ff;font-weight:800}
+.timepick.live select{border-color:var(--green)}

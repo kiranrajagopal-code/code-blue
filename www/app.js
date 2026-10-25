@@ -178,26 +178,42 @@
     var colon = document.createElement('span'); colon.className = 'colon'; colon.textContent = ':';
     var nowB = document.createElement('button'); nowB.className = 'now'; nowB.textContent = 'Now'; nowB.type = 'button';
     el.appendChild(hS); el.appendChild(colon); el.appendChild(mS); el.appendChild(aS); el.appendChild(nowB);
-    function setNow() {
+    // "live" = still showing the current time (not changed by the user): it keeps updating,
+    // and on START it means "right now" to the second, so the timer starts at 00:00.
+    var live = true;
+    function showNow() {
       var d = new Date(), hh = d.getHours();
       aS.value = hh >= 12 ? 'PM' : 'AM'; hh = hh % 12; if (hh === 0) hh = 12;
       hS.value = String(hh); mS.value = mins[d.getMinutes()];
     }
+    function setNow() { live = true; el.classList.add('live'); showNow(); }
+    [hS, mS, aS].forEach(function (x) { x.addEventListener('change', function () { live = false; el.classList.remove('live'); }); });
     nowB.addEventListener('click', setNow);
     setNow();
     return {
       setNow: setNow,
-      get: function (ref) { return L.timeFrom12h(hS.value, mS.value, aS.value, ref || now()); }
+      refresh: function () { if (live) showNow(); },
+      isLive: function () { return live; },
+      get: function (ref) { return live ? now() : L.timeFrom12h(hS.value, mS.value, aS.value, ref || now()); }
     };
   }
   var tpArrest = buildTimePicker($('tpArrest'));
   var tpCpr = buildTimePicker($('tpCpr'));
 
+  /* Fresh start form: clears previous entries and sets both times to now */
+  function resetForm() {
+    $('initRhythm').value = ''; $('location').value = '';
+    tpArrest.setNow(); tpCpr.setNow();
+  }
+  // keep "Now" times current while the start screen is open (e.g. app left open for hours)
+  setInterval(function () { if (!$('home').classList.contains('hidden')) { tpArrest.refresh(); tpCpr.refresh(); } }, 5000);
+  $('btnNew').addEventListener('click', function () { resetForm(); window.scrollTo(0, 0); startAlarm({ kind: 'prewarn', title: 'Ready for a new code', body: 'Times set to now. Select rhythm and press START.' }); });
+
   /* ---------- HOME ---------- */
   $('btnStart').addEventListener('click', function () {
     audio();
     var t = now();
-    var cprAt = tpCpr.get(), arrestAt = tpArrest.get(cprAt);
+    var cprAt = tpCpr.get(), arrestAt = tpArrest.isLive() ? cprAt : tpArrest.get(cprAt);
     var rhythm = $('initRhythm').value || null;
     var problems = [];
     if (cprAt - arrestAt > 3 * 60 * L.MIN) problems.push('Arrest time ' + L.clock(arrestAt) + ' does not fit CPR start ' + L.clock(cprAt) + ' — arrest must be before CPR. Check the time and AM/PM.');
@@ -324,9 +340,9 @@
   buildChecklist($('airwayList'), L.AIRWAY_ITEMS, 'airway', false);
 
   /* ---------- end + summary ---------- */
-  function endCode(outcome) {
+  function endCode(outcome, atTime) {
     stopAlarm();
-    add({ type: 'end', outcome: outcome });
+    add({ type: 'end', outcome: outcome, t: atTime });
     history.push(cur); if (history.length > 30) history = history.slice(-30); save('cb.history', history);
     var finished = cur; cur = null; save('cb.current', null);
     cancelNotifications(); metroStop();
@@ -369,7 +385,7 @@
     if (navigator.clipboard) navigator.clipboard.writeText(lastSummary).then(function () { startAlarm({ kind: 'prewarn', title: 'Copied' }); });
   }
   $('btnCopy').addEventListener('click', copyText);
-  $('btnHome').addEventListener('click', function () { show('home'); renderHistory(); tpArrest.setNow(); tpCpr.setNow(); });
+  $('btnHome').addEventListener('click', function () { show('home'); renderHistory(); resetForm(); });
 
   /* ---------- modals ---------- */
   function modal(title, bodyEl, buttons) {
@@ -559,10 +575,16 @@
   setInterval(tick, 250);
 
   /* ---------- app lifecycle ---------- */
+  var lastHidden = now();
   if (App) {
     App.addListener('appStateChange', function (st) {
       appActive = !!st.isActive;
-      if (appActive) { cancelNotifications(); tick(); } else scheduleNotifications();
+      if (appActive) {
+        cancelNotifications(); tick();
+        // coming back to the start screen after a while: begin with a fresh form
+        if (!cur && !$('home').classList.contains('hidden') && now() - lastHidden > 10 * L.MIN) resetForm();
+        else { tpArrest.refresh(); tpCpr.refresh(); }
+      } else { lastHidden = now(); scheduleNotifications(); }
     });
     App.addListener('backButton', function () {
       if (!$('modal').classList.contains('hidden')) { closeModal(); return; }
@@ -582,5 +604,12 @@
   if (cur && cur.events && cur.events.length && cur.events[0].arrestAt !== undefined && running()) {
     if (KeepAwake) KeepAwake.keepAwake().catch(function () {});
     show('run'); render();
+    var age = now() - cur.events[0].t;
+    if (age > 30 * L.MIN) {
+      modal('Previous code still open', textEl('A code started at ' + L.clock(cur.events[0].t) + ' (' + Math.round(age / L.MIN) + ' min ago) was not ended.'), [
+        { text: 'Close it & start a NEW code', cls: 'danger', fn: function () { endCode('Not closed in app', cur.events[cur.events.length - 1].t); show('home'); renderHistory(); resetForm(); } },
+        { text: 'Continue previous code', cls: 'ghost' }
+      ]);
+    }
   } else { cur = null; show('home'); }
 })();
