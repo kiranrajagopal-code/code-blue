@@ -1,0 +1,9 @@
+{
+  "appId": "in.drkiran.codeblue",
+  "appName": "Code Blue",
+  "webDir": "www",
+  "android": { "backgroundColor": "#0b0f14" },
+  "plugins": {
+    "LocalNotifications": { "iconColor": "#ff3b3b" }
+  }
+}

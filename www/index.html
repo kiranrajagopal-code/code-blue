@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b0f14">
+<title>Code Blue</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="banner" class="banner hidden" role="alert"></div>
+
+<!-- HOME -->
+<section id="home" class="screen">
+  <header class="home-head">
+    <div class="logo">✚</div>
+    <h1>Code Blue</h1>
+    <button class="icon-btn" id="btnSettings" aria-label="Settings">⚙</button>
+  </header>
+
+  <div class="card">
+    <div class="label">Initial rhythm</div>
+    <div class="chips" id="startRhythm">
+      <button data-r="VF" class="chip shock">VF</button>
+      <button data-r="pVT" class="chip shock">pVT</button>
+      <button data-r="PEA" class="chip nonshock">PEA</button>
+      <button data-r="Asystole" class="chip nonshock">Asystole</button>
+      <button data-r="" class="chip sel">Unknown</button>
+    </div>
+
+    <div class="label">Arrest started</div>
+    <div class="stepper">
+      <button id="offMinus" class="step">−</button>
+      <div id="offVal" class="step-val">Now</div>
+      <button id="offPlus" class="step">+</button>
+    </div>
+
+    <div class="label">Location / bed (optional)</div>
+    <input id="location" class="input" placeholder="e.g. MICU bed 4" autocomplete="off">
+  </div>
+
+  <button id="btnStart" class="big-start">START CODE</button>
+
+  <div id="exactWarn" class="card warn hidden">
+    <b>Allow on-time alerts</b>
+    <p>Android needs "Alarms &amp; reminders" permission so alerts sound exactly on time when the screen is locked.</p>
+    <button id="btnExact" class="btn">Open setting</button>
+  </div>
+
+  <div class="card">
+    <div class="label">Past codes</div>
+    <div id="history" class="history"><div class="muted">None yet</div></div>
+  </div>
+  <p class="disclaimer">Decision support only. Follow your current ACLS/ALS guideline and clinical judgement.</p>
+</section>
+
+<!-- RUNNING -->
+<section id="run" class="screen hidden">
+  <div class="topbar">
+    <div>
+      <div class="elapsed" id="elapsed">00:00</div>
+      <div class="sub" id="startedAt">Started —</div>
+    </div>
+    <div class="counts">
+      <div><span id="cShocks">0</span><small>shocks</small></div>
+      <div><span id="cAdr">0</span><small>adrenaline</small></div>
+      <div><span id="cAA">0</span><small id="cAAlbl">amio</small></div>
+    </div>
+  </div>
+
+  <div id="roscPanel" class="card rosc hidden">
+    <div class="rosc-title">ROSC</div>
+    <div class="sub" id="roscSince"></div>
+    <div class="row2">
+      <button id="btnRearrest" class="btn danger">RE-ARREST</button>
+      <button id="btnEndRosc" class="btn ok">End code (ROSC)</button>
+    </div>
+  </div>
+
+  <div id="livePanel">
+    <div id="cycleCard" class="card cycle">
+      <div class="cycle-head">
+        <span>CPR cycle <span id="cycleNo"></span></span>
+        <span class="rhythm-badge" id="rhythmBadge">Rhythm ?</span>
+      </div>
+      <div class="cycle-time" id="cycleTime">02:00</div>
+      <div class="bar"><div id="cycleBar"></div></div>
+      <div class="cycle-msg" id="cycleMsg">Next rhythm / pulse check</div>
+    </div>
+
+    <div class="label tight">Rhythm check — tap to log &amp; restart cycle</div>
+    <div class="rhythms">
+      <button data-r="VF" class="rbtn shock">VF</button>
+      <button data-r="pVT" class="rbtn shock">pVT</button>
+      <button data-r="PEA" class="rbtn nonshock">PEA</button>
+      <button data-r="Asystole" class="rbtn nonshock">Asys</button>
+      <button id="btnRosc" class="rbtn rosc-btn">ROSC</button>
+    </div>
+
+    <button id="btnShock" class="action shockbtn">⚡ SHOCK DELIVERED <span id="shockNext"></span></button>
+
+    <div id="adrCard" class="card drug">
+      <div class="drug-row">
+        <div>
+          <div class="drug-name">Adrenaline 1 mg</div>
+          <div class="sub" id="adrReason"></div>
+        </div>
+        <div class="drug-time" id="adrTime">—</div>
+      </div>
+      <button id="btnAdr" class="action adr">ADRENALINE GIVEN</button>
+    </div>
+
+    <div id="aaCard" class="card drug hidden">
+      <div class="drug-row">
+        <div>
+          <div class="drug-name" id="aaName">Amiodarone</div>
+          <div class="sub" id="aaReason"></div>
+        </div>
+        <div class="drug-time" id="aaTime"></div>
+      </div>
+      <button id="btnAA" class="action aa">GIVEN</button>
+    </div>
+  </div>
+
+  <nav class="tabs">
+    <button data-tab="tHsts" class="tab">Hs &amp; Ts</button>
+    <button data-tab="tAirway" class="tab">Airway</button>
+    <button data-tab="tLog" class="tab">Log</button>
+    <button data-tab="tMore" class="tab">More</button>
+  </nav>
+  <div id="tHsts" class="tabpane hidden"><div id="hstsList" class="checklist"></div></div>
+  <div id="tAirway" class="tabpane hidden"><div id="airwayList" class="checklist"></div></div>
+  <div id="tLog" class="tabpane hidden"><div id="logList" class="log"></div></div>
+  <div id="tMore" class="tabpane hidden">
+    <div class="label">Other drugs</div>
+    <div class="chips" id="otherDrugs">
+      <button class="chip">Calcium chloride 10%</button>
+      <button class="chip">Sodium bicarbonate</button>
+      <button class="chip">Magnesium 2 g</button>
+      <button class="chip">Atropine</button>
+      <button class="chip">Fluid bolus</button>
+      <button class="chip">Thrombolysis</button>
+      <button class="chip">Dextrose</button>
+      <button class="chip">Potassium</button>
+    </div>
+    <div class="label">Note</div>
+    <div class="row2">
+      <input id="noteText" class="input" placeholder="Type a note…">
+      <button id="btnNote" class="btn">Add</button>
+    </div>
+    <div class="label">CPR metronome</div>
+    <button id="btnMetro" class="btn">Metronome: OFF</button>
+  </div>
+
+  <div class="bottombar">
+    <button id="btnUndo" class="btn ghost">↶ Undo</button>
+    <button id="btnSettings2" class="btn ghost">⚙</button>
+    <button id="btnEnd" class="btn danger">End code</button>
+  </div>
+</section>
+
+<!-- SUMMARY -->
+<section id="summary" class="screen hidden">
+  <header class="home-head"><h1>Code record</h1></header>
+  <pre id="summaryText" class="summary"></pre>
+  <div class="row2">
+    <button id="btnShare" class="btn ok">Share / export</button>
+    <button id="btnCopy" class="btn">Copy</button>
+  </div>
+  <button id="btnHome" class="btn ghost wide">Back to home</button>
+</section>
+
+<!-- MODALS -->
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <h2 id="modalTitle"></h2>
+    <div id="modalBody"></div>
+    <div id="modalBtns" class="modal-btns"></div>
+  </div>
+</div>
+
+<script src="native.js"></script>
+<script src="logic.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

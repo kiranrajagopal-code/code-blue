@@ -1,0 +1,74 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install
+        run: npm ci
+
+      - name: Test timing logic
+        run: npm test
+
+      - name: Bundle device bridge
+        run: npm run build
+
+      - name: Create Android project
+        run: |
+          npx cap add android
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />\n</manifest>#' android/app/src/main/AndroidManifest.xml
+          sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"1.0.${{ github.run_number }}\"/" android/app/build.gradle
+
+      - name: App icon
+        continue-on-error: true
+        run: npx --yes @capacitor/assets@3.0.5 generate --android --iconBackgroundColor '#d7263d' --iconBackgroundColorDark '#d7263d'
+
+      - name: Sync web app into Android
+        run: npx cap sync android
+
+      - name: Use fixed signing key (so updates install over the old app)
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then mkdir -p ~/.android && echo "$KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore; echo "fixed key in use"; else echo "no key secret; using a temporary key"; fi
+
+      - name: Build APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk ../CodeBlue.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CodeBlue-apk
+          path: CodeBlue.apk
+
+      - name: Publish download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Code Blue 1.0.${{ github.run_number }}
+          body: "Download **CodeBlue.apk** below and open it on your Android phone to install."
+          files: CodeBlue.apk
+          make_latest: true
