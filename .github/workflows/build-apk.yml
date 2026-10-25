@@ -39,9 +39,13 @@ jobs:
           sed -i 's#</manifest>#    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />\n</manifest>#' android/app/src/main/AndroidManifest.xml
           sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"1.0.${{ github.run_number }}\"/" android/app/build.gradle
 
-      - name: App icon
-        continue-on-error: true
-        run: npx --yes @capacitor/assets@3.0.5 generate --android --iconBackgroundColor '#d7263d' --iconBackgroundColorDark '#d7263d'
+      - name: App icon (CPR pictogram, all sizes incl. adaptive)
+        run: |
+          rm -f android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml android/app/src/main/res/drawable/ic_launcher_background.xml android/app/src/main/res/values/ic_launcher_background.xml
+          cp -r android-res/* android/app/src/main/res/
+          sed -i 's#<item name="android:background">@drawable/splash</item>#<item name="android:background">@drawable/splash</item>\n        <item name="windowSplashScreenBackground">\#0B0F14</item>#' android/app/src/main/res/values/styles.xml
+          grep -n "windowSplashScreenBackground" android/app/src/main/res/values/styles.xml
+          ls android/app/src/main/res/mipmap-anydpi-v26/
 
       - name: Sync web app into Android
         run: npx cap sync android
