@@ -20,20 +20,20 @@
 
   <div class="card">
     <div class="label">Initial rhythm</div>
-    <div class="chips" id="startRhythm">
-      <button data-r="VF" class="chip shock">VF</button>
-      <button data-r="pVT" class="chip shock">pVT</button>
-      <button data-r="PEA" class="chip nonshock">PEA</button>
-      <button data-r="Asystole" class="chip nonshock">Asystole</button>
-      <button data-r="" class="chip sel">Unknown</button>
-    </div>
+    <select id="initRhythm" class="input select">
+      <option value="">— Select —</option>
+      <option>ASYSTOLE</option>
+      <option>PEA</option>
+      <option>VT</option>
+      <option>VF</option>
+    </select>
 
-    <div class="label">Arrest started</div>
-    <div class="stepper">
-      <button id="offMinus" class="step">−</button>
-      <div id="offVal" class="step-val">Now</div>
-      <button id="offPlus" class="step">+</button>
-    </div>
+    <div class="label">Time of arrest</div>
+    <div class="timepick" id="tpArrest"></div>
+
+    <div class="label">Time of initiation of Code Blue / CPR</div>
+    <div class="timepick" id="tpCpr"></div>
+    <div class="sub" style="margin-top:6px">The main timer and 2-minute prompts run from this time.</div>
 
     <div class="label">Location / bed (optional)</div>
     <input id="location" class="input" placeholder="e.g. MICU bed 4" autocomplete="off">
@@ -42,8 +42,8 @@
   <button id="btnStart" class="big-start">START CODE</button>
 
   <div id="exactWarn" class="card warn hidden">
-    <b>Allow on-time alerts</b>
-    <p>Android needs "Alarms &amp; reminders" permission so alerts sound exactly on time when the screen is locked.</p>
+    <b>Allow on-time alarms</b>
+    <p>Android needs "Alarms &amp; reminders" permission so alarms ring exactly on time when the screen is locked.</p>
     <button id="btnExact" class="btn">Open setting</button>
   </div>
 
@@ -58,13 +58,14 @@
 <section id="run" class="screen hidden">
   <div class="topbar">
     <div>
+      <div class="sub">CPR time</div>
       <div class="elapsed" id="elapsed">00:00</div>
-      <div class="sub" id="startedAt">Started —</div>
+      <div class="sub" id="startedAt"></div>
     </div>
     <div class="counts">
-      <div><span id="cShocks">0</span><small>shocks</small></div>
+      <div><span id="cCycles">0</span><small>cycles</small></div>
+      <div><span id="cSwitch">0</span><small>switches</small></div>
       <div><span id="cAdr">0</span><small>adrenaline</small></div>
-      <div><span id="cAA">0</span><small id="cAAlbl">amio</small></div>
     </div>
   </div>
 
@@ -80,24 +81,15 @@
   <div id="livePanel">
     <div id="cycleCard" class="card cycle">
       <div class="cycle-head">
-        <span>CPR cycle <span id="cycleNo"></span></span>
+        <span>Cycle <span id="cycleNo"></span></span>
         <span class="rhythm-badge" id="rhythmBadge">Rhythm ?</span>
       </div>
+      <div class="cycle-msg big" id="cycleMsg">SWITCH COMPRESSOR · CHECK PULSE</div>
       <div class="cycle-time" id="cycleTime">02:00</div>
       <div class="bar"><div id="cycleBar"></div></div>
-      <div class="cycle-msg" id="cycleMsg">Next rhythm / pulse check</div>
+      <div class="sub" id="cycleAt"></div>
+      <button id="btnCycleAck" class="action ack hidden">✓ SWITCHED &amp; PULSE CHECKED</button>
     </div>
-
-    <div class="label tight">Rhythm check — tap to log &amp; restart cycle</div>
-    <div class="rhythms">
-      <button data-r="VF" class="rbtn shock">VF</button>
-      <button data-r="pVT" class="rbtn shock">pVT</button>
-      <button data-r="PEA" class="rbtn nonshock">PEA</button>
-      <button data-r="Asystole" class="rbtn nonshock">Asys</button>
-      <button id="btnRosc" class="rbtn rosc-btn">ROSC</button>
-    </div>
-
-    <button id="btnShock" class="action shockbtn">⚡ SHOCK DELIVERED <span id="shockNext"></span></button>
 
     <div id="adrCard" class="card drug">
       <div class="drug-row">
@@ -107,8 +99,21 @@
         </div>
         <div class="drug-time" id="adrTime">—</div>
       </div>
+      <div class="sub" id="adrAt"></div>
       <button id="btnAdr" class="action adr">ADRENALINE GIVEN</button>
+      <div class="adr-list" id="adrList"></div>
     </div>
+
+    <div class="label tight">Rhythm now (tap to log)</div>
+    <div class="rhythms">
+      <button data-r="ASYSTOLE" class="rbtn nonshock">ASYSTOLE</button>
+      <button data-r="PEA" class="rbtn nonshock">PEA</button>
+      <button data-r="VT" class="rbtn shock">VT</button>
+      <button data-r="VF" class="rbtn shock">VF</button>
+      <button id="btnRosc" class="rbtn rosc-btn">ROSC</button>
+    </div>
+
+    <button id="btnShock" class="action shockbtn">⚡ SHOCK DELIVERED <span id="shockNext"></span></button>
 
     <div id="aaCard" class="card drug hidden">
       <div class="drug-row">
@@ -122,15 +127,18 @@
     </div>
   </div>
 
+  <div class="card">
+    <div class="log-head"><span class="label" style="margin:0">Log</span><span class="sub" id="logStats"></span></div>
+    <div id="logList" class="log"></div>
+  </div>
+
   <nav class="tabs">
     <button data-tab="tHsts" class="tab">Hs &amp; Ts</button>
     <button data-tab="tAirway" class="tab">Airway</button>
-    <button data-tab="tLog" class="tab">Log</button>
-    <button data-tab="tMore" class="tab">More</button>
+    <button data-tab="tMore" class="tab">Drugs / note</button>
   </nav>
   <div id="tHsts" class="tabpane hidden"><div id="hstsList" class="checklist"></div></div>
   <div id="tAirway" class="tabpane hidden"><div id="airwayList" class="checklist"></div></div>
-  <div id="tLog" class="tabpane hidden"><div id="logList" class="log"></div></div>
   <div id="tMore" class="tabpane hidden">
     <div class="label">Other drugs</div>
     <div class="chips" id="otherDrugs">

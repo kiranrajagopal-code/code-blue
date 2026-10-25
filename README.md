@@ -2,8 +2,9 @@
 
 Cardiac arrest timer and log for Android.
 
-- 2-minute CPR cycle countdown with 15 s pre-warning, rhythm/pulse check and compressor rotation prompts
-- Adrenaline 1 mg timer (every 3, 4 or 5 min); first dose ASAP in PEA/asystole, after 2nd (AHA) or 3rd (ERC) shock in VF/pVT
+- Enter initial rhythm (ASYSTOLE, PEA, VT, VF), time of arrest and time CPR started (12-hour, AM/PM)
+- Timer runs from CPR start; every 2 min a ringing + visual alarm: SWITCH COMPRESSOR · CHECK PULSE
+- Adrenaline alarm every 4 min (3–5 adjustable) from the last dose, ringing + visual
 - Amiodarone 300 → 150 mg (or lignocaine) after shocks 3 and 5
 - Sound + vibration alerts, including with the screen locked
 - Hs & Ts and airway checklists, other drugs, notes, CPR metronome
