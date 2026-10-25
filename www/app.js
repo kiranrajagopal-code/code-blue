@@ -334,10 +334,31 @@
     showSummary(finished);
   }
   function showSummary(c) {
+    lastCode = c;
     lastSummary = L.summaryText(c.events, c.settings, c.meta);
     $('summaryText').textContent = lastSummary;
     show('summary');
   }
+  var lastCode = null;
+  function b64FromArrayBuffer(buf) {
+    var bytes = new Uint8Array(buf), bin = '', chunk = 0x8000;
+    for (var i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    return btoa(bin);
+  }
+  $('btnPdf').addEventListener('click', function () {
+    if (!lastCode || !window.CBMakePdf) return;
+    var btn = this; btn.disabled = true; btn.textContent = 'Preparing PDF…';
+    var done = function () { btn.disabled = false; btn.textContent = '📄 EXPORT PDF — save / print / share'; };
+    try {
+      var doc = window.CBMakePdf(lastCode), name = window.CBPdfName(lastCode);
+      if (NATIVE && P.Filesystem) {
+        P.Filesystem.writeFile({ path: name, data: b64FromArrayBuffer(doc.output('arraybuffer')), directory: P.Directory.Cache })
+          .then(function (r) { return Share.share({ title: name, dialogTitle: 'Save, print or share PDF', files: [r.uri] }); })
+          .catch(function (e) { if (!/cancel/i.test(String(e && e.message))) startAlarm({ kind: 'prewarn', title: 'PDF could not be shared', body: String(e && e.message || e) }); })
+          .then(done);
+      } else { doc.save(name); done(); }
+    } catch (e) { done(); startAlarm({ kind: 'prewarn', title: 'PDF error', body: String(e && e.message || e) }); }
+  });
   $('btnShare').addEventListener('click', function () {
     if (!lastSummary) return;
     if (Share) Share.share({ title: 'Code Blue record', text: lastSummary, dialogTitle: 'Share code record' }).catch(function () {});

@@ -158,3 +158,8 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
 .log .ev.k-arrest,.log .ev.k-start{font-weight:800}
 .tabs{grid-template-columns:repeat(3,1fr)}
 .banner .silence{display:block;margin-top:8px;font-size:13px;font-weight:700;opacity:.85}
+
+/* v4: owner footer + PDF */
+.owner{text-align:center;color:var(--muted);font-size:13px;margin:6px 0 24px;letter-spacing:.02em}
+.owner b{color:var(--text);font-weight:700}
+.action.pdf{background:var(--red);margin:6px 0 12px}

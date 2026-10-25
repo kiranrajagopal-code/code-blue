@@ -5,16 +5,19 @@
   "description": "Code Blue cardiac arrest timer and log",
   "scripts": {
     "test": "node test/logic.test.js",
-    "build": "esbuild src/native.js --bundle --format=iife --target=es2017 --minify --outfile=www/native.js"
+    "build": "esbuild src/native.js --bundle --format=iife --target=es2017 --minify --external:html2canvas --external:dompurify --external:canvg --outfile=www/native.js"
   },
   "dependencies": {
     "@capacitor-community/keep-awake": "8.0.1",
     "@capacitor/android": "8.5.3",
     "@capacitor/app": "8.1.2",
     "@capacitor/core": "8.5.3",
+    "@capacitor/filesystem": "8.1.5",
     "@capacitor/haptics": "8.0.2",
     "@capacitor/local-notifications": "8.3.1",
-    "@capacitor/share": "8.0.3"
+    "@capacitor/share": "8.0.3",
+    "jspdf": "4.2.1",
+    "jspdf-autotable": "5.0.9"
   },
   "devDependencies": {
     "@capacitor/cli": "8.5.3",

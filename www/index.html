@@ -52,6 +52,7 @@
     <div id="history" class="history"><div class="muted">None yet</div></div>
   </div>
   <p class="disclaimer">Decision support only. Follow your current ACLS/ALS guideline and clinical judgement.</p>
+  <footer class="owner">Developed by <b>Dr. Kiran Rajagopal</b></footer>
 </section>
 
 <!-- RUNNING -->
@@ -170,12 +171,14 @@
 <!-- SUMMARY -->
 <section id="summary" class="screen hidden">
   <header class="home-head"><h1>Code record</h1></header>
+  <button id="btnPdf" class="action pdf">📄 EXPORT PDF — save / print / share</button>
   <pre id="summaryText" class="summary"></pre>
   <div class="row2">
-    <button id="btnShare" class="btn ok">Share / export</button>
+    <button id="btnShare" class="btn">Share as text</button>
     <button id="btnCopy" class="btn">Copy</button>
   </div>
   <button id="btnHome" class="btn ghost wide">Back to home</button>
+  <footer class="owner">Developed by <b>Dr. Kiran Rajagopal</b></footer>
 </section>
 
 <!-- MODALS -->
@@ -189,6 +192,7 @@
 
 <script src="native.js"></script>
 <script src="logic.js"></script>
+<script src="pdf.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
