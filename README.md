@@ -12,6 +12,6 @@ Cardiac arrest timer and log for Android.
 
 **Android:** open the latest release on your phone and download `CodeBlue.apk`.
 
-**iPhone:** open https://kiranrajagopal-code.github.io/code-blue/ in Safari → Share → Add to Home Screen.
+**iPhone:** open https://kiranrajagopal-code.github.io/code-blue/ in Safari (opens the app in /www) → Share → Add to Home Screen.
 
 Decision support only. Follow current ACLS/ALS guidelines and clinical judgement.
