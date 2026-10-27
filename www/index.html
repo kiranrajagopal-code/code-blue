@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#0b0f14">
 <title>Code Blue</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Code Blue">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -13,7 +21,7 @@
 <!-- HOME -->
 <section id="home" class="screen">
   <header class="home-head">
-    <div class="logo">✚</div>
+    <img class="logo-img" src="icons/icon-192.png" alt="">
     <h1>Code Blue</h1>
     <button class="icon-btn" id="btnSettings" aria-label="Settings">⚙</button>
   </header>
@@ -42,6 +50,15 @@
   </div>
 
   <button id="btnStart" class="big-start">START CODE</button>
+
+  <div id="iosInstall" class="card warn hidden">
+    <b>Install on iPhone</b>
+    <p>In Safari, tap <b>Share</b> <span class="ios-share">⬆</span> → <b>Add to Home Screen</b> → <b>Add</b>. Then open Code Blue from the home screen icon.</p>
+  </div>
+  <div id="iosNote" class="card hidden">
+    <b>iPhone: keep Code Blue on screen during a code</b>
+    <p class="sub" style="margin:6px 0 0">iPhone does not allow web apps to ring when locked or in the background. The screen stays on automatically while a code runs. Keep media volume up.</p>
+  </div>
 
   <div id="exactWarn" class="card warn hidden">
     <b>Allow on-time alarms</b>

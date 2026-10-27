@@ -28,9 +28,51 @@
   var actx = null;
   function audio() {
     if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
-    if (actx && actx.state === 'suspended') actx.resume();
+    if (actx && actx.state !== 'running') { try { actx.resume(); } catch (e) {} }
     return actx;
   }
+
+  /* ---------- iPhone / web support ---------- */
+  var IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var STANDALONE = !!(navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
+  // Make sound play even when the iPhone ring/silent switch is on silent:
+  // a looping silent media track puts Safari's audio session into "playback" mode.
+  var silentEl = null;
+  function silentWavUrl() {
+    var n = 8000, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    function str(o, t) { for (var i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); }
+    str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true);
+    v.setUint32(28, 16000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, n * 2, true);
+    return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  }
+  function unlockAudio() {
+    audio();
+    if (NATIVE) return;
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    try {
+      if (!silentEl) { silentEl = document.createElement('audio'); silentEl.src = silentWavUrl(); silentEl.loop = true; silentEl.setAttribute('playsinline', ''); silentEl.volume = 0.01; }
+      var pr = silentEl.play(); if (pr && pr.catch) pr.catch(function () {});
+    } catch (e) {}
+  }
+  // Keep the screen on during a code (Android plugin, or the browser Wake Lock API on iPhone/web)
+  var wakeLock = null, wantAwake = false;
+  function keepAwake() {
+    wantAwake = true;
+    if (KeepAwake) { KeepAwake.keepAwake().catch(function () {}); return; }
+    if (navigator.wakeLock && !wakeLock) {
+      navigator.wakeLock.request('screen').then(function (l) { wakeLock = l; l.addEventListener('release', function () { wakeLock = null; }); }).catch(function () {});
+    }
+  }
+  function allowSleep() {
+    wantAwake = false;
+    if (KeepAwake) { KeepAwake.allowSleep().catch(function () {}); return; }
+    if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+    if (silentEl) { try { silentEl.pause(); } catch (e) {} }
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') { if (wantAwake) { keepAwake(); unlockAudio(); } }
+  });
   /* Soft bell: sine fundamental + quiet overtone, quick attack, natural decay (ear-friendly). */
   function bell(freq, start, dur, vol) {
     var a = audio(); if (!a) return;
@@ -211,7 +253,7 @@
 
   /* ---------- HOME ---------- */
   $('btnStart').addEventListener('click', function () {
-    audio();
+    unlockAudio();
     var t = now();
     var cprAt = tpCpr.get(), arrestAt = tpArrest.isLive() ? cprAt : tpArrest.get(cprAt);
     var rhythm = $('initRhythm').value || null;
@@ -229,7 +271,7 @@
     // do not ring for check points that passed before the app was started
     L.alerts(cur.events, cur.settings, now(), 0).forEach(function (a) { if (a.at < now() - 2000 && a.kind !== 'adr') cur.fired[a.key] = 1; });
     persist();
-    if (KeepAwake) KeepAwake.keepAwake().catch(function () {});
+    keepAwake();
     setupNotifications();
     logCount = -1;
     show('run'); render();
@@ -346,7 +388,7 @@
     history.push(cur); if (history.length > 30) history = history.slice(-30); save('cb.history', history);
     var finished = cur; cur = null; save('cb.current', null);
     cancelNotifications(); metroStop();
-    if (KeepAwake) KeepAwake.allowSleep().catch(function () {});
+    allowSleep();
     showSummary(finished);
   }
   function showSummary(c) {
@@ -372,7 +414,14 @@
           .then(function (r) { return Share.share({ title: name, dialogTitle: 'Save, print or share PDF', files: [r.uri] }); })
           .catch(function (e) { if (!/cancel/i.test(String(e && e.message))) startAlarm({ kind: 'prewarn', title: 'PDF could not be shared', body: String(e && e.message || e) }); })
           .then(done);
-      } else { doc.save(name); done(); }
+      } else {
+        // iPhone / web: open the share sheet with the PDF (Save to Files, Print, WhatsApp, Mail…)
+        var file = null;
+        try { file = new File([doc.output('blob')], name, { type: 'application/pdf' }); } catch (e) {}
+        if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: name }).catch(function () {}).then(done);
+        } else { doc.save(name); done(); }
+      }
     } catch (e) { done(); startAlarm({ kind: 'prewarn', title: 'PDF error', body: String(e && e.message || e) }); }
   });
   $('btnShare').addEventListener('click', function () {
@@ -599,10 +648,19 @@
   });
 
   /* ---------- boot ---------- */
+  if (!NATIVE) {
+    if (IOS) {
+      $('iosNote').classList.remove('hidden');
+      if (!STANDALONE) { var ii = $('iosInstall'); ii.classList.remove('hidden'); $('btnNew').insertAdjacentElement('afterend', ii); }
+    }
+    if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
+    // any tap re-arms sound on iPhone (Safari can suspend audio after the app was in the background)
+    document.addEventListener('touchend', function () { if (cur) unlockAudio(); }, { passive: true });
+  }
   renderHistory(); metroSync();
   if (NATIVE) setupNotifications();
   if (cur && cur.events && cur.events.length && cur.events[0].arrestAt !== undefined && running()) {
-    if (KeepAwake) KeepAwake.keepAwake().catch(function () {});
+    keepAwake();
     show('run'); render();
     var age = now() - cur.events[0].t;
     if (age > 30 * L.MIN) {

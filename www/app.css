@@ -168,3 +168,6 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
 
 .newcode{margin:8px 0 4px;background:var(--panel2);border-color:var(--blue);color:#9cc3ff;font-weight:800}
 .timepick.live select{border-color:var(--green)}
+
+.ios-share{display:inline-block;padding:0 6px;border-radius:6px;background:var(--panel2);font-weight:800}
+.logo-img{width:40px;height:40px;border-radius:10px}

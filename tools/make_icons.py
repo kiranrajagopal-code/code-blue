@@ -76,4 +76,8 @@ for folder, (w, h) in SPL.items():
 
 # also keep a 1024 px master icon
 place(Image.new('RGBA', (1024, 1024), RED+(255,)), 0.74).convert('RGB').save('assets/icon-only.png')
+# web / iPhone icons (iOS rounds the corners itself, so these are full-bleed and opaque)
+os.makedirs('www/icons', exist_ok=True)
+for name, n, frac in (('apple-touch-icon.png', 180, 0.74), ('icon-192.png', 192, 0.74), ('icon-512.png', 512, 0.74), ('icon-maskable-512.png', 512, 0.58)):
+    place(Image.new('RGBA', (n, n), RED+(255,)), frac).convert('RGB').save('www/icons/' + name)
 print('icons + splash written')

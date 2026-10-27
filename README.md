@@ -10,6 +10,8 @@ Cardiac arrest timer and log for Android.
 - Hs & Ts and airway checklists, other drugs, notes, CPR metronome
 - Time-stamped event log with undo; share/export at the end; past codes saved on the phone
 
-**Install:** open the latest release on your phone and download `CodeBlue.apk`.
+**Android:** open the latest release on your phone and download `CodeBlue.apk`.
+
+**iPhone:** open https://kiranrajagopal-code.github.io/code-blue/ in Safari → Share → Add to Home Screen.
 
 Decision support only. Follow current ACLS/ALS guidelines and clinical judgement.
