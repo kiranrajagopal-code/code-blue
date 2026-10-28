@@ -1,4 +1,5 @@
 # Code Blue
+[![DOI](https://zenodo.org/badge/1433237265.svg)](https://doi.org/10.5281/zenodo.23731806)
 
 Cardiac arrest timer and log for Android.
 
