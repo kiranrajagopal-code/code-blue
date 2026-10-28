@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Code Blue"
+abstract: "Real-time cardiac arrest (Code Blue) monitoring app for the ICU."
+type: software
+authors:
+  - family-names: Rajagopal
+    given-names: Kiran
+    orcid: "https://orcid.org/0000-0002-4613-2696"
+    affiliation: "Dept. of Critical Care Medicine, Sree Gokulam Medical College, Trivandrum"
+version: "1.0"
+date-released: "2026-10-28"
+license: MIT
+repository-code: "https://github.com/kiranrajagopal-code/code-blue"
