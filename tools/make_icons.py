@@ -2,7 +2,7 @@
 Run: python3 tools/make_icons.py"""
 from PIL import Image, ImageDraw, ImageFont
 import os, glob
-S = 2048; RED = (215, 38, 61); BG = (11, 15, 20); W = (255, 255, 255, 255); CUT = (0, 0, 0, 0)
+S = 2048; RED = (215, 38, 61); BG = (6, 11, 24); W = (255, 255, 255, 255); CUT = (0, 0, 0, 0)
 
 def pictogram():
     """Rescuer kneeling at the patient's side, facing the viewer, straight arms locked on the chest."""
@@ -44,6 +44,41 @@ def pictogram():
 
 art = pictogram()
 
+# ---- premium finish ----
+from PIL import ImageFilter, ImageChops
+def finish(a):
+    """White pictogram with a faint cool sheen and a soft drop shadow for depth."""
+    w, h = a.size; pad = int(max(w, h) * 0.08)
+    out = Image.new('RGBA', (w + 2*pad, h + 2*pad), CUT)
+    alpha = a.split()[3]
+    sh = Image.new('RGBA', a.size, (70, 0, 18, 0)); sh.putalpha(alpha.point(lambda v: int(v * 0.35)))
+    shl = Image.new('RGBA', out.size, CUT); shl.alpha_composite(sh, (pad, pad + int(h * 0.035)))
+    shl = shl.filter(ImageFilter.GaussianBlur(max(w, h) * 0.025))
+    sheen = Image.new('RGBA', a.size); px = []
+    top, bot = (255, 255, 255), (236, 241, 255)
+    grad = Image.linear_gradient('L').resize(a.size)
+    sheen = Image.composite(Image.new('RGBA', a.size, bot + (255,)), Image.new('RGBA', a.size, top + (255,)), grad)
+    sheen.putalpha(alpha)
+    out.alpha_composite(shl); out.alpha_composite(sheen, (pad, pad))
+    return out
+art = finish(art)
+
+def tile(n, shape='square'):
+    """Deep crimson gradient with a soft light from top-left and a gentle vignette."""
+    gy = Image.linear_gradient('L'); gx = gy.rotate(90)
+    g = ImageChops.add(gy, gx.transpose(Image.FLIP_LEFT_RIGHT).transpose(Image.FLIP_LEFT_RIGHT).transpose(Image.FLIP_TOP_BOTTOM), scale=2).resize((n, n), Image.BICUBIC)
+    c1 = Image.new('RGBA', (n, n), (244, 64, 88, 255)); c2 = Image.new('RGBA', (n, n), (156, 14, 42, 255))
+    bg = Image.composite(c2, c1, g)
+    glow = Image.radial_gradient('L').resize((int(n*1.6), int(n*1.6)))
+    glow = glow.point(lambda v: int(max(0, 255 - v) * 0.16))
+    gl = Image.new('RGBA', glow.size, (255, 255, 255, 0)); gl.putalpha(glow)
+    bg.alpha_composite(gl, (-int(n*0.55), -int(n*0.6)))
+    if shape == 'full': return bg
+    m = Image.new('L', (n, n), 0); d = ImageDraw.Draw(m)
+    if shape == 'round': d.ellipse([0, 0, n-1, n-1], fill=255)
+    else: d.rounded_rectangle([0, 0, n-1, n-1], radius=int(n*0.22), fill=255)
+    o = Image.new('RGBA', (n, n), CUT); o.paste(bg, (0, 0), m); return o
+
 def place(canvas, frac, yoff=0.0):
     n = canvas.size[0]; sc = frac*n/max(art.size)
     a = art.resize((max(1, int(art.size[0]*sc)), max(1, int(art.size[1]*sc))), Image.LANCZOS)
@@ -52,19 +87,20 @@ def place(canvas, frac, yoff=0.0):
 R = 'android-res'
 for k, m in {'mdpi': 1, 'hdpi': 1.5, 'xhdpi': 2, 'xxhdpi': 3, 'xxxhdpi': 4}.items():
     os.makedirs(f'{R}/mipmap-{k}', exist_ok=True)
-    n = int(108*m); place(Image.new('RGBA', (n, n), CUT), 0.56, 0.0).save(f'{R}/mipmap-{k}/ic_launcher_foreground.png')
+    n = int(108*m); place(Image.new('RGBA', (n, n), CUT), 0.62, 0.0).save(f'{R}/mipmap-{k}/ic_launcher_foreground.png')
+    tile(n, 'full').convert('RGB').save(f'{R}/mipmap-{k}/ic_launcher_background.png')
     n = int(48*m)
-    sq = Image.new('RGBA', (n, n), CUT); ImageDraw.Draw(sq).rounded_rectangle([0, 0, n-1, n-1], radius=int(n*0.18), fill=RED+(255,))
-    place(sq, 0.74, 0.0).save(f'{R}/mipmap-{k}/ic_launcher.png')
-    rd = Image.new('RGBA', (n, n), CUT); ImageDraw.Draw(rd).ellipse([0, 0, n-1, n-1], fill=RED+(255,))
-    place(rd, 0.64, 0.0).save(f'{R}/mipmap-{k}/ic_launcher_round.png')
+    sq = tile(n, 'square')
+    place(sq, 0.82, 0.0).save(f'{R}/mipmap-{k}/ic_launcher.png')
+    rd = tile(n, 'round')
+    place(rd, 0.72, 0.0).save(f'{R}/mipmap-{k}/ic_launcher_round.png')
 
 # launch screens (sizes match Capacitor's template)
 SPL = {'drawable': (480, 320), 'drawable-land-hdpi': (800, 480), 'drawable-land-mdpi': (480, 320), 'drawable-land-xhdpi': (1280, 720),
        'drawable-land-xxhdpi': (1600, 960), 'drawable-land-xxxhdpi': (1920, 1280), 'drawable-port-hdpi': (480, 800), 'drawable-port-mdpi': (320, 480),
        'drawable-port-xhdpi': (720, 1280), 'drawable-port-xxhdpi': (960, 1600), 'drawable-port-xxxhdpi': (1280, 1920)}
 icon = Image.open(f'{R}/mipmap-xxxhdpi/ic_launcher.png').convert('RGBA')
-B = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'; Rg = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+B = 'www/fonts/bsc-700.woff2'; Rg = 'www/fonts/barlow-500.woff2'
 for folder, (w, h) in SPL.items():
     u = min(w, h); im = Image.new('RGBA', (w, h), BG+(255,)); d = ImageDraw.Draw(im)
     isz = int(u*0.34); top = int(h*0.5 - isz*0.85)
@@ -75,9 +111,9 @@ for folder, (w, h) in SPL.items():
     os.makedirs(f'{R}/{folder}', exist_ok=True); im.convert('RGB').save(f'{R}/{folder}/splash.png')
 
 # also keep a 1024 px master icon
-place(Image.new('RGBA', (1024, 1024), RED+(255,)), 0.74).convert('RGB').save('assets/icon-only.png')
+place(tile(1024, 'full'), 0.80).convert('RGB').save('assets/icon-only.png')
 # web / iPhone icons (iOS rounds the corners itself, so these are full-bleed and opaque)
 os.makedirs('www/icons', exist_ok=True)
 for name, n, frac in (('apple-touch-icon.png', 180, 0.74), ('icon-192.png', 192, 0.74), ('icon-512.png', 512, 0.74), ('icon-maskable-512.png', 512, 0.58)):
-    place(Image.new('RGBA', (n, n), RED+(255,)), frac).convert('RGB').save('www/icons/' + name)
+    place(tile(n, 'full'), frac + 0.06).convert('RGB').save('www/icons/' + name)
 print('icons + splash written')

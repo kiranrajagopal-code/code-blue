@@ -73,31 +73,57 @@
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible') { if (wantAwake) { keepAwake(); unlockAudio(); } }
   });
-  /* Soft bell: sine fundamental + quiet overtone, quick attack, natural decay (ear-friendly). */
+  /* ---------- Premium alarm voice ----------
+   Vibraphone-like mallet tone (fundamental + soft 4th/10th partials, natural decay) played
+   through a short concert-hall reverb and a gentle compressor: warm, clear, never shrill. */
+  var bus = null;
+  function busOut() {
+    var a = audio(); if (!a) return null;
+    if (bus && bus.ctx === a) return bus.input;
+    try {
+    var input = a.createGain(), comp = a.createDynamicsCompressor(), master = a.createGain();
+    comp.threshold.value = -20; comp.knee.value = 18; comp.ratio.value = 3.5; comp.attack.value = 0.004; comp.release.value = 0.25;
+    master.gain.value = 0.92;
+    // reverb: synthetic stereo hall impulse (1.6 s), mixed quietly
+    var len = Math.floor(a.sampleRate * 1.6), ir = a.createBuffer(2, len, a.sampleRate);
+    for (var ch = 0; ch < 2; ch++) { var d = ir.getChannelData(ch); for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
+    var verb = a.createConvolver(); verb.buffer = ir;
+    var wet = a.createGain(); wet.gain.value = 0.22;
+    var tone = a.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 6500; // softens any edge
+    input.connect(tone); tone.connect(comp); tone.connect(verb); verb.connect(wet); wet.connect(comp);
+    comp.connect(master); master.connect(a.destination);
+    bus = { ctx: a, input: input };
+    } catch (e) { bus = { ctx: a, input: a.destination }; }   // fallback: plain output, alarm still sounds
+    return bus.input;
+  }
   function bell(freq, start, dur, vol) {
-    var a = audio(); if (!a) return;
+    try { bellVoice(freq, start, dur, vol); } catch (e) {}   // sound must never break the alarm logic
+  }
+  function bellVoice(freq, start, dur, vol) {
+    var a = audio(), out = busOut(); if (!a || !out) return;
     var t0 = a.currentTime + start, v = Math.max(0.0002, vol || 0.5);
-    [[1, 1], [2.01, 0.25], [3.02, 0.08]].forEach(function (p) {
+    // [ratio, level, decay seconds]
+    [[1, 1, dur * 1.6], [0.5, 0.18, dur * 1.2], [4.0, 0.22, dur * 0.35], [10.0, 0.05, dur * 0.12]].forEach(function (p) {
       var o = a.createOscillator(), g = a.createGain();
       o.type = 'sine'; o.frequency.value = freq * p[0];
       g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(v * p[1], t0 + 0.015);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      o.connect(g); g.connect(a.destination);
-      o.start(t0); o.stop(t0 + dur + 0.05);
+      g.gain.exponentialRampToValueAtTime(v * p[1], t0 + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + p[2]);
+      o.connect(g); g.connect(out);
+      o.start(t0); o.stop(t0 + p[2] + 0.05);
     });
   }
   var NOTES = {           // first note is also used for the gentle build-up
-    cycle: [[1319, 0], [1047, 0.32]],              // ding-dong
-    adr: [[784, 0], [988, 0.22], [1175, 0.44]],    // rising chime
-    aa: [[880, 0], [659, 0.3]],
-    prewarn: [[1047, 0]]
+    cycle: [[880, 0], [659.3, 0.34]],                            // A5 → E5: two-tone "switch · check"
+    adr: [[523.3, 0], [659.3, 0.16], [784, 0.32], [1046.5, 0.5]], // C–E–G–C rising arpeggio: "give drug"
+    aa: [[1174.7, 0], [880, 0.3]],                               // D6 → A5
+    prewarn: [[880, 0]]
   };
   function chime(kind, vol) {
     (NOTES[kind] || NOTES.cycle).forEach(function (n) { bell(n[0], n[1], 0.9, vol); });
   }
   var PATTERNS = {
-    cycle: function () { chime('cycle', 0.8); },
+    cycle: function () { chime('cycle', 0.85); },
     adr: function () { chime('adr', 0.8); },
     aa: function () { chime('aa', 0.8); },
     prewarn: function () { chime('prewarn', 0.3); }
@@ -520,7 +546,7 @@
       card.classList.toggle('soon', !pend && rem <= (cur.settings.rampSec || 10) * 1000);
       $('cycleNo').textContent = x.cycleNo;
       $('cycleTime').textContent = L.mmss(rem + 999);
-      $('cycleBar').style.width = Math.min(100, Math.max(0, (1 - rem / total) * 100)) + '%';
+      var frac = Math.min(1, Math.max(0, 1 - rem / total)); $('cycleBar').style.strokeDashoffset = String(Math.round((1 - frac) * 1000) / 1000);
       $('cycleMsg').textContent = pend ? 'SWITCH COMPRESSOR · CHECK PULSE NOW' : 'Next: switch compressor · check pulse';
       $('cycleAt').textContent = 'at ' + L.clock(x.cycleDue);
       $('btnCycleAck').classList.toggle('hidden', !pend);

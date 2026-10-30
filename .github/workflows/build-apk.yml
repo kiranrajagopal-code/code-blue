@@ -43,7 +43,7 @@ jobs:
         run: |
           rm -f android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml android/app/src/main/res/drawable/ic_launcher_background.xml android/app/src/main/res/values/ic_launcher_background.xml
           cp -r android-res/* android/app/src/main/res/
-          sed -i 's#<item name="android:background">@drawable/splash</item>#<item name="android:background">@drawable/splash</item>\n        <item name="windowSplashScreenBackground">\#0B0F14</item>#' android/app/src/main/res/values/styles.xml
+          sed -i 's#<item name="android:background">@drawable/splash</item>#<item name="android:background">@drawable/splash</item>\n        <item name="windowSplashScreenBackground">\#060B18</item>#' android/app/src/main/res/values/styles.xml
           grep -n "windowSplashScreenBackground" android/app/src/main/res/values/styles.xml
           ls android/app/src/main/res/mipmap-anydpi-v26/
 

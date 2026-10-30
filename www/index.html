@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#0b0f14">
+<meta name="theme-color" content="#060b18">
 <title>Code Blue</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -104,10 +104,18 @@
         <span>Cycle <span id="cycleNo"></span></span>
         <span class="rhythm-badge" id="rhythmBadge">Rhythm ?</span>
       </div>
+      <div class="dial">
+        <svg viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="dial-track" cx="100" cy="100" r="88" pathLength="1"/>
+          <circle class="dial-ticks" cx="100" cy="100" r="96" pathLength="120"/>
+          <circle id="cycleBar" class="dial-arc" cx="100" cy="100" r="88" pathLength="1" transform="rotate(-90 100 100)"/>
+        </svg>
+        <div class="dial-face">
+          <div class="cycle-time" id="cycleTime">02:00</div>
+          <div class="dial-at" id="cycleAt"></div>
+        </div>
+      </div>
       <div class="cycle-msg big" id="cycleMsg">SWITCH COMPRESSOR · CHECK PULSE</div>
-      <div class="cycle-time" id="cycleTime">02:00</div>
-      <div class="bar"><div id="cycleBar"></div></div>
-      <div class="sub" id="cycleAt"></div>
       <button id="btnCycleAck" class="action ack hidden">✓ SWITCHED &amp; PULSE CHECKED</button>
     </div>
 
