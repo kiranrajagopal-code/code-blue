@@ -338,9 +338,18 @@
   $('btnShock').addEventListener('click', function () {
     add({ type: 'shock', n: L.derive(cur.events).shocks + 1 });
   });
+  // clear confirmation that the dose registered: green button + green card flash + vibration
+  var adrFlashT = null;
   $('btnAdr').addEventListener('click', function () {
     if (alarm && alarm.kind === 'adr') stopAlarm();
-    add({ type: 'adr', n: L.derive(cur.events).adrDoses + 1 });
+    var n = L.derive(cur.events).adrDoses + 1;
+    add({ type: 'adr', n: n });
+    vibrate(120);
+    var b = $('btnAdr'), card = $('adrCard');
+    b.classList.add('done'); b.textContent = '✓ DOSE ' + n + ' GIVEN · ' + L.clock(now());
+    card.classList.remove('given'); void card.offsetWidth; card.classList.add('given');
+    clearTimeout(adrFlashT);
+    adrFlashT = setTimeout(function () { b.classList.remove('done'); b.textContent = 'ADRENALINE GIVEN'; card.classList.remove('given'); }, 4000);
   });
   $('btnAA').addEventListener('click', function () {
     var x = L.status(cur.events, cur.settings, now());
@@ -574,7 +583,10 @@
       $('adrReason').textContent = x.adrReason;
       var given = cur.events.filter(function (e) { return e.type === 'adr'; });
       var al = $('adrList'); al.innerHTML = '';
-      given.forEach(function (e, i) { var sp = document.createElement('span'); sp.textContent = (i + 1) + ': ' + L.clock(e.t); al.appendChild(sp); });
+      given.forEach(function (e, i) { var sp = document.createElement('span'); sp.textContent = (i + 1) + ': ' + L.clock(e.t); if (i === given.length - 1) sp.className = 'last'; al.appendChild(sp); });
+      var lastAdr = given[given.length - 1], la = $('adrLast');
+      if (lastAdr) { la.classList.remove('hidden'); la.innerHTML = '✓ Last dose <b>#' + given.length + '</b> given at <b>' + L.clock(lastAdr.t) + '</b> · ' + L.mmss(now() - lastAdr.t) + ' ago'; }
+      else la.classList.add('hidden');
 
       var aac = $('aaCard'), aa = x.aa;
       var showAA = aa && (aa.ready || (L.isShockable(s.rhythm) && s.shocks >= 2));

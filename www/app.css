@@ -232,3 +232,10 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 
 @keyframes pulse{50%{filter:brightness(1.3)}}
 @media (prefers-reduced-motion:reduce){.cycle.due,.drug.due{animation:none}.dial-arc{transition:none}}
+/* adrenaline given: unmistakable confirmation */
+.action.adr.done{background:linear-gradient(180deg,#5fe3a1,#18a864 60%,#11894f);color:#062014;box-shadow:0 0 0 3px rgba(61,220,132,.35)}
+.drug.given{animation:adrGiven 4s ease-out}
+@keyframes adrGiven{0%{background:#0f6b3f;border-color:#3ddc84;box-shadow:0 0 0 4px rgba(61,220,132,.45)}25%{background:#0f6b3f;border-color:#3ddc84}100%{}}
+.adr-last{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(61,220,132,.12);border:1px solid rgba(61,220,132,.4);color:#bff3d6;font-size:14px;font-weight:600}
+.adr-last b{color:#fff;font-variant-numeric:tabular-nums}
+.adr-list span.last{background:rgba(61,220,132,.2);border-color:rgba(61,220,132,.6);color:#d9ffe9}

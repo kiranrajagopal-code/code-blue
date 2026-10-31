@@ -1,6 +1,6 @@
 /* Code Blue offline cache: app works with no network (e.g. in the ICU).
    Serves from cache instantly, refreshes the cache in the background, so updates appear on the next open. */
-var CACHE = 'codeblue-v2';
+var CACHE = 'codeblue-v3';
 var FILES = ['./', 'index.html', 'app.css', 'native.js', 'logic.js', 'pdf.js', 'app.js', 'manifest.webmanifest',
   'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png',
   'fonts/bsc-500.woff2', 'fonts/bsc-600.woff2', 'fonts/bsc-700.woff2', 'fonts/bsc-800.woff2',
