@@ -55,7 +55,12 @@ jobs:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
         run: |
           if [ -z "$KEYSTORE_B64" ]; then echo "::error::Add the KEYSTORE_B64 secret (Settings > Secrets and variables > Actions). Not building with a random key."; exit 1; fi
-          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/app.keystore"
+          clean=$(printf '%s' "$KEYSTORE_B64" | tr -d ' \r\n\t')
+          echo "::warning::KEYSTORE_B64 length after removing spaces: ${#clean} characters"
+          if ! printf '%s' "$clean" | base64 -d > "$RUNNER_TEMP/app.keystore" 2>/dev/null; then echo "::error::KEYSTORE_B64 is not valid. Copy the whole text file again (one long line) and replace the secret."; exit 1; fi
+          fp=$(keytool -list -v -keystore "$RUNNER_TEMP/app.keystore" -storepass android 2>/dev/null | grep -m1 'SHA256:' | awk '{print $2}' | cut -c1-23)
+          if [ -z "$fp" ]; then echo "::error::KEYSTORE_B64 decoded but is not a usable key (text cut short?). Copy the whole file again and replace the secret."; exit 1; fi
+          echo "::warning::Signing certificate fingerprint starts $fp"
           python3 - <<'PY'
           import os, re
           p = 'android/app/build.gradle'; s = open(p).read()
