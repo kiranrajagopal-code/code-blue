@@ -50,11 +50,21 @@ jobs:
       - name: Sync web app into Android
         run: npx cap sync android
 
-      - name: Use fixed signing key (so updates install over the old app)
+      - name: Signing key from the repository secret (same key every build, so updates install over the old app)
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
         run: |
-          if [ -n "$KEYSTORE_B64" ]; then mkdir -p ~/.android && echo "$KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore; echo "fixed key in use"; else echo "no key secret; using a temporary key"; fi
+          if [ -z "$KEYSTORE_B64" ]; then echo "::error::Add the KEYSTORE_B64 secret (Settings > Secrets and variables > Actions). Not building with a random key."; exit 1; fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/app.keystore"
+          python3 - <<'PY'
+          import os, re
+          p = 'android/app/build.gradle'; s = open(p).read()
+          ks = os.environ['RUNNER_TEMP'] + '/app.keystore'
+          cfg = "\n    signingConfigs {\n        debug {\n            storeFile file('%s')\n            storePassword 'android'\n            keyAlias 'androiddebugkey'\n            keyPassword 'android'\n        }\n    }\n" % ks
+          s = re.sub(r'^android \{', 'android {' + cfg, s, count=1, flags=re.M)
+          open(p, 'w').write(s)
+          PY
+          grep -c "signingConfigs" android/app/build.gradle
 
       - name: Build APK
         working-directory: android
